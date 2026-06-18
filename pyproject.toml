@@ -1,0 +1,21 @@
+[project]
+name = "ios-media-downloader-gateway"
+version = "0.1.0"
+description = "HTTP/JSON gateway wrapping yt-dlp + gallery-dl so an iOS Shortcut can download social media"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "yt-dlp>=2024.0",
+    "gallery-dl>=1.27",
+    "prometheus-client>=0.20",
+    "pydantic>=2.6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]

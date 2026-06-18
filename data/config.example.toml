@@ -1,0 +1,86 @@
+[server]
+host = "0.0.0.0"
+port = 8080
+json_logs = false                 # overridable by --json-logs flag / JSON_LOGS env
+db_path = "./data/audit.sqlite3"
+cache_ttl_seconds = 300           # reuse extract_info between /formats and /download
+# Server-side merge (YouTube HD): /v1/best joins the best video-only + audio via
+# ffmpeg and streams the result. Needs ffmpeg on PATH (or set ffmpeg_path).
+ffmpeg_path = "ffmpeg"
+# public_base_url is used to build the /v1/stream URL handed to the Shortcut.
+# Leave empty to derive it from the incoming request; set it behind a proxy/CDN,
+# e.g. "https://media.example.com".
+public_base_url = ""
+merge_url_ttl_seconds = 21600     # how long a /v1/stream token stays valid (6h)
+merge_max_height = 1080           # cap merged video at this resolution
+
+[[api_keys]]
+name = "tom-iphone"
+key = "CHANGE_ME_1"
+max_devices = 0          # 0 = unlimited; e.g. 1 to bind this key to a single device
+
+[[api_keys]]
+name = "family-ipad"
+key = "CHANGE_ME_2"
+max_devices = 3          # at most 3 distinct devices; newer devices are rejected (403)
+
+[format_filter]
+prefer_vcodec = ["avc1", "h264"]  # iOS-friendly video
+prefer_acodec = ["mp4a", "aac"]
+prefer_ext    = ["mp4", "m4a", "jpg"]
+
+# gallery-dl handles photo posts / image galleries (TikTok photo slideshows,
+# Instagram & Twitter image carousels). Some sites — notably Instagram — require
+# login, or extraction aborts at a "redirect to login page". Provide auth here:
+[gallery]
+config_file          = ""   # path to a full gallery-dl JSON config
+cookies              = ""   # path to a Netscape cookies.txt (applied to all extractors)
+cookies_from_browser = ""   # or pull cookies from a browser, e.g. "firefox" / "chrome" / "safari"
+
+# Per-site selectors. Each endpoint has a yt-dlp format sort (`sort`, the -S flag)
+# and selector (`format`, the -f flag). best/medium use `format = "b"` so the
+# Shortcut downloads a single progressive file; `res:720` caps medium at ~720p
+# (res = the smaller dimension, so it works for portrait video too).
+#
+# IMPORTANT: every sort starts with `vcodec:avc`. TikTok's HEVC (bytevc1) play URLs
+# are VIDEO-ONLY in practice even though yt-dlp labels them acodec=aac — downloading
+# one yields a silent clip. `vcodec:avc` ranks the reliably-muxed (and iOS-friendly)
+# h264 formats first, so `b` only picks another codec when no h264 rendition exists.
+# This caps "best" at the top h264 rendition (often 720p on TikTok) — the right
+# trade: audio that works over a silent higher resolution.
+[sites.tiktok]
+enabled = true
+domains = ["tiktok.com", "vm.tiktok.com"]
+best   = { sort = "vcodec:avc",         format = "b" }
+medium = { sort = "vcodec:avc,res:720", format = "b" }
+audio  = { sort = "vcodec:avc",         format = "ba/b" }
+video  = { sort = "vcodec:avc,res:720", format = "bv/b" }
+
+[sites.instagram]
+enabled = true
+domains = ["instagram.com", "instagr.am"]
+best   = { sort = "vcodec:avc",         format = "b" }
+medium = { sort = "vcodec:avc,res:720", format = "b" }
+audio  = { sort = "vcodec:avc",         format = "ba/b" }
+video  = { sort = "vcodec:avc,res:720", format = "bv/b" }
+
+[sites.twitter]
+enabled = true
+domains = ["twitter.com", "x.com"]
+best   = { sort = "vcodec:avc",         format = "b" }
+medium = { sort = "vcodec:avc,res:720", format = "b" }
+audio  = { sort = "vcodec:avc",         format = "ba/b" }
+video  = { sort = "vcodec:avc,res:720", format = "bv/b" }
+
+# YouTube & YouTube Shorts. Shorts (youtube.com/shorts/<id>) and youtu.be short
+# links use the same extractor. best/medium use progressive (format "b"), which on
+# YouTube tops out at ~360-720p single-file with audio; higher resolutions only
+# exist as separate video/audio streams that would need merging (not supported).
+[sites.youtube]
+enabled = true
+domains = ["youtube.com", "youtu.be"]
+merge_best = true        # /v1/best merges HD video+audio server-side (needs ffmpeg)
+best   = { sort = "vcodec:avc",         format = "b" }
+medium = { sort = "vcodec:avc,res:720", format = "b" }
+audio  = { sort = "acodec:aac",         format = "ba[ext=m4a]/ba/b" }
+video  = { sort = "vcodec:avc,res:720", format = "bv/b" }
