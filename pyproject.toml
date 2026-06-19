@@ -1,6 +1,6 @@
 [project]
 name = "ios-media-downloader-gateway"
-version = "0.1.0"
+version = "0.1.1"
 description = "HTTP/JSON gateway wrapping yt-dlp + gallery-dl so an iOS Shortcut can download social media"
 readme = "README.md"
 requires-python = ">=3.11"

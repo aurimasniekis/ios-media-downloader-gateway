@@ -132,7 +132,7 @@ def _build_media_items(source, items_info, cookies, site, kind):
 
 
 def create_app(config: Config) -> FastAPI:
-    app = FastAPI(title="ios-media-downloader-gateway", version="0.1.0")
+    app = FastAPI(title="ios-media-downloader-gateway", version="0.1.1")
     app.state.config = config
     app.state.extractor = Extractor(config.server.cache_ttl_seconds)
     app.state.gallery = GalleryExtractor(
