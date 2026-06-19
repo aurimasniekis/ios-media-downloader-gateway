@@ -62,18 +62,24 @@ curl -s localhost:8080/healthz       # {"status":"ok"}
 
 ### Docker Compose
 
-The repo ships a `compose.yaml`:
+For a **ready-to-run deployment** using the published image, use the
+self-contained [`docker/`](docker) folder (no source checkout needed — copy just
+that folder):
 
 ```bash
-docker compose up -d            # pulls/builds and starts
+cd docker
+cp data/config.example.toml data/config.toml   # then set real API keys
+docker compose up -d
 docker compose logs -f
-docker compose ps
-docker compose down             # stop & remove
 ```
 
-`compose.yaml` references the published image but also has `build: .`, so
-`docker compose up -d --build` builds locally and `docker compose pull` grabs the
-latest published image.
+`docker/` ships a `compose.yaml` (image-only, `docker compose pull` to update), a
+`data/config.example.toml`, and a `Makefile` of helpers (`make help` lists them —
+`make up`, `make update`, `make logs`, `make devices`, …).
+
+The `compose.yaml` in the **repo root** is for **development**: it has `build: .`
+so `docker compose up -d --build` builds the image from source. (The root also
+has a `Makefile.compose` with the same helpers — `make -f Makefile.compose help`.)
 
 ### From source (uv)
 

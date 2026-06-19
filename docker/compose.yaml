@@ -1,0 +1,24 @@
+services:
+  gateway:
+    # Published image from Docker Hub — no local build. Run `docker compose pull`
+    # to update. (The compose.yaml in the repo root builds from source instead.)
+    image: aurimasniekis/ios-media-downloader-gateway:latest
+    container_name: ios-media-downloader-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      # config.toml + audit.sqlite3 persist on the host under ./data (docker/data).
+      # Create ./data/config.toml from ./data/config.example.toml before first run.
+      - ./data:/app/data
+    environment:
+      # Overrides the json_logs config flag; remove for human-readable logs.
+      JSON_LOGS: "true"
+      # Behind a reverse proxy/CDN, set public_base_url in data/config.toml so the
+      # merge URL (/v1/stream) handed to the Shortcut is reachable.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

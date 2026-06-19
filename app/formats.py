@@ -13,6 +13,7 @@ from .models import DownloadItem, FormatChoice
 
 IMAGE_EXTS = {"jpg", "jpeg", "png", "webp", "gif", "heic", "bmp", "avif"}
 AUDIO_EXTS = {"mp3", "m4a", "aac", "opus", "ogg", "wav", "flac"}
+VIDEO_EXTS = {"mp4", "m4v", "mov", "webm", "mkv", "flv", "ts", "avi", "3gp"}
 
 _MIME_BY_EXT = {
     "mp4": "video/mp4",
@@ -39,12 +40,20 @@ def _has_audio(fmt: dict) -> bool:
     return fmt.get("acodec") not in (None, "none")
 
 
+def _looks_like_video(fmt: dict) -> bool:
+    # Some extractors (e.g. Facebook) leave vcodec unset on progressive mp4s, so
+    # also treat a URL with a video container ext as video.
+    if _has_video(fmt):
+        return True
+    return bool(fmt.get("url")) and (fmt.get("ext") or "").lower() in VIDEO_EXTS
+
+
 def item_has_video(item_info: dict) -> bool:
     """True if the item exposes at least one video stream."""
     for fmt in item_info.get("formats") or []:
-        if _has_video(fmt):
+        if _looks_like_video(fmt):
             return True
-    return _has_video(item_info)
+    return _looks_like_video(item_info)
 
 
 def item_has_audio(item_info: dict) -> bool:

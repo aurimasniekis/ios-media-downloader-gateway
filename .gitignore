@@ -18,10 +18,10 @@ venv/
 htmlcov/
 
 # Local secrets & runtime data (keep config.example.toml)
-data/config.toml
-data/*.sqlite3
-data/*.sqlite3-wal
-data/*.sqlite3-shm
+**/data/config.toml
+**/data/*.sqlite3
+**/data/*.sqlite3-wal
+**/data/*.sqlite3-shm
 .env
 
 # Editor / OS
