@@ -303,12 +303,14 @@ via `exec` (compose service is `gateway`):
 # Docker Compose
 docker compose exec gateway python -m app.main devices list
 docker compose exec gateway python -m app.main logs --days 10 --api-key tom-iphone
+docker compose exec gateway python -m app.main stats
 
 # plain Docker
 docker exec ios-media-downloader-gateway python -m app.main devices list
 
 # from source
 uv run python -m app.main devices list
+uv run python -m app.main stats
 ```
 
 ### Device limits
@@ -351,6 +353,16 @@ docker compose exec gateway python -m app.main devices remove --api-key family-i
   docker compose exec gateway python -m app.main logs --days 7 --api-key tom-iphone --limit 50
   # or directly:
   sqlite3 ./data/audit.sqlite3 "select * from downloads order by ts desc limit 20;"
+  ```
+
+- **Usage stats** — per-API-key rollup of successful media downloads (version
+  checks excluded): how many devices use each key, downloads/items per device,
+  and per-key totals. Always shows the per-device breakdown; `--api-key` narrows
+  to one key.
+
+  ```bash
+  docker compose exec gateway python -m app.main stats
+  docker compose exec gateway python -m app.main stats --api-key tom-iphone
   ```
 
 - **Metrics** — Prometheus at `/metrics`: `media_gateway_requests_total`,

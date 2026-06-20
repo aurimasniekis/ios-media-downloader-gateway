@@ -7,7 +7,7 @@ URL    ?=
 
 .DEFAULT_GOAL := help
 
-.PHONY: help sync run run-json health metrics audit logs devices check best curl clean
+.PHONY: help sync run run-json health metrics audit logs devices stats check best curl clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -36,6 +36,9 @@ logs: ## Show audit log via CLI (DAYS=10 API_KEY=name optional)
 
 devices: ## List registered devices (API_KEY=name optional to filter)
 	uv run python -m app.main --config $(CONFIG) devices list $(if $(API_KEY),--api-key $(API_KEY),)
+
+stats: ## Show per-API-key usage stats (API_KEY=name optional to filter)
+	uv run python -m app.main --config $(CONFIG) stats $(if $(API_KEY),--api-key $(API_KEY),)
 
 check: ## POST VERSION=... to /v1/check (default 1.0.0)
 	curl -s -X POST localhost:$(PORT)/v1/check \

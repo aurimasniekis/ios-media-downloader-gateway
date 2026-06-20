@@ -9,7 +9,7 @@ APP     := python -m app.main
 .DEFAULT_GOAL := help
 
 .PHONY: help config up update pull start stop restart down recreate \
-        ps status logs shell exec health metrics devices devices-remove audit clean
+        ps status logs shell exec health metrics devices devices-remove stats audit clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -86,6 +86,9 @@ devices-remove: ## Remove device(s): API_KEY=name + DEVICE_ID=.. | LABEL=.. | AL
 
 audit: ## Show the audit log via the CLI (DAYS=10 API_KEY=name optional)
 	$(COMPOSE) exec $(SERVICE) $(APP) logs --days $(or $(DAYS),10) $(if $(API_KEY),--api-key $(API_KEY),)
+
+stats: ## Show per-API-key usage stats (API_KEY=name optional to filter)
+	$(COMPOSE) exec $(SERVICE) $(APP) stats $(if $(API_KEY),--api-key $(API_KEY),)
 
 clean: ## Stop and remove containers, networks, and anonymous volumes
 	$(COMPOSE) down --remove-orphans

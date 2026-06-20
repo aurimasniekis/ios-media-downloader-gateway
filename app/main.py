@@ -788,6 +788,9 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     logs.add_argument("--api-key", default=None, help="filter by API key name")
     logs.add_argument("--limit", type=int, default=100, help="max rows to show")
 
+    stats = sub.add_parser("stats", help="show per-API-key usage statistics")
+    stats.add_argument("--api-key", default=None, help="filter by API key name")
+
     return parser.parse_args(argv)
 
 
@@ -847,6 +850,96 @@ def _cmd_logs(args: argparse.Namespace, config: Config) -> None:
         db.close()
 
 
+def _device_stats_rows(db: AuditDB, api_key_name: str) -> list[tuple]:
+    """Per-device successful-download rows for one API key.
+
+    Recomputes each download row's fingerprint (mirroring registration) so
+    counts align with registered ``device_id``s, then joins to the registered
+    devices for canonical labels and surfaces removed devices as
+    ``(unregistered)``.
+    """
+    registered = db.list_registered(api_key_name)
+    by_id = {d["device_id"]: d for d in registered}
+
+    NO_DEVICE = "(no device)"
+    acc: dict[str, dict] = {}
+    for row in db.device_download_counts(api_key_name):
+        device = {
+            "name": row[0],
+            "hostname": row[1],
+            "model": row[2],
+            "type": row[3],
+            "screen_width": row[4],
+            "screen_height": row[5],
+        }
+        fingerprint, label = device_fingerprint(device)
+        key = fingerprint if fingerprint is not None else NO_DEVICE
+        bucket = acc.setdefault(
+            key, {"downloads": 0, "items": 0, "last_used": None, "label": label}
+        )
+        bucket["downloads"] += row[6]
+        bucket["items"] += row[7]
+        if row[8] and (bucket["last_used"] is None or row[8] > bucket["last_used"]):
+            bucket["last_used"] = row[8]
+        if bucket["label"] is None:
+            bucket["label"] = label
+
+    rows: list[tuple] = []
+    seen_ids: set[str] = set()
+    for key, bucket in acc.items():
+        if key == NO_DEVICE:
+            device_id, label = NO_DEVICE, bucket["label"] or NO_DEVICE
+        elif key in by_id:
+            seen_ids.add(key)
+            device_id = key
+            label = by_id[key]["label"] or bucket["label"] or "device"
+        else:
+            device_id, label = "(unregistered)", bucket["label"] or "device"
+        rows.append(
+            (device_id, label, bucket["downloads"], bucket["items"], bucket["last_used"] or "-")
+        )
+
+    for device_id, d in by_id.items():
+        if device_id not in seen_ids:
+            rows.append((device_id, d["label"] or "device", 0, 0, d["last_seen"] or "-"))
+
+    rows.sort(key=lambda r: r[2], reverse=True)
+    return rows
+
+
+def _cmd_stats(args: argparse.Namespace, config: Config) -> None:
+    db = AuditDB(config.server.db_path)
+    try:
+        totals = {row[0]: row for row in db.key_totals()}
+        configured = [k.name for k in config.api_keys]
+        names = list(dict.fromkeys([*configured, *totals.keys()]))
+        if args.api_key:
+            names = [n for n in names if n == args.api_key]
+
+        summary_rows = []
+        for name in names:
+            total = totals.get(name)
+            summary_rows.append(
+                (
+                    name,
+                    len(db.list_registered(name)),
+                    total[1] if total else 0,
+                    total[2] if total else 0,
+                    (total[3] if total else None) or "-",
+                )
+            )
+        _print_table(["KEY", "DEVICES", "DOWNLOADS", "ITEMS", "LAST_USED"], summary_rows)
+
+        for name in names:
+            print(f"\n== {name} ==")
+            _print_table(
+                ["DEVICE_ID", "LABEL", "DOWNLOADS", "ITEMS", "LAST_USED"],
+                _device_stats_rows(db, name),
+            )
+    finally:
+        db.close()
+
+
 def main(argv: list[str] | None = None) -> None:
     args = _parse_args(argv)
     config = load_config(
@@ -860,6 +953,8 @@ def main(argv: list[str] | None = None) -> None:
         _cmd_devices(args, config)
     elif command == "logs":
         _cmd_logs(args, config)
+    elif command == "stats":
+        _cmd_stats(args, config)
     else:
         _run_server(config)
 

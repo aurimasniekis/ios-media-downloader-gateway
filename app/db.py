@@ -295,6 +295,52 @@ class AuditDB:
         with self._lock:
             return self._conn.execute(sql, params).fetchall()
 
+    # --- usage statistics -----------------------------------------------------
+
+    def key_totals(self, api_key_name: str | None = None) -> list[tuple]:
+        """Per-key successful-download totals (version checks excluded).
+
+        Returns ``(api_key_name, downloads, items, last_used)`` rows.
+        """
+        sql = (
+            "SELECT api_key_name, COUNT(*) AS downloads, "
+            "COALESCE(SUM(item_count), 0) AS items, MAX(ts) AS last_used "
+            "FROM downloads WHERE status = 'ok' AND endpoint != '/v1/check'"
+        )
+        params: list = []
+        if api_key_name:
+            sql += " AND api_key_name = ?"
+            params.append(api_key_name)
+        sql += " GROUP BY api_key_name"
+        with self._lock:
+            return self._conn.execute(sql, params).fetchall()
+
+    def device_download_counts(self, api_key_name: str) -> list[tuple]:
+        """Successful-download counts grouped by device fingerprint columns.
+
+        Returns ``(device_name, device_hostname, device_model, device_type,
+        device_screen_width, device_screen_height, downloads, items,
+        last_used)`` rows — one per distinct device-field combo, to be folded
+        further by recomputed fingerprint in Python.
+        """
+        group_cols = (
+            "device_name",
+            "device_hostname",
+            "device_model",
+            "device_type",
+            "device_screen_width",
+            "device_screen_height",
+        )
+        sql = (
+            f"SELECT {', '.join(group_cols)}, COUNT(*) AS downloads, "
+            "COALESCE(SUM(item_count), 0) AS items, MAX(ts) AS last_used "
+            "FROM downloads WHERE status = 'ok' AND endpoint != '/v1/check' "
+            "AND api_key_name = ? "
+            f"GROUP BY {', '.join(group_cols)}"
+        )
+        with self._lock:
+            return self._conn.execute(sql, (api_key_name,)).fetchall()
+
     def close(self) -> None:
         with self._lock:
             self._conn.close()
