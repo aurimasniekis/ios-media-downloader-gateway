@@ -1,6 +1,7 @@
 """yt-dlp extraction wrapper with a short TTL in-memory cache."""
 from __future__ import annotations
 
+import re
 import threading
 import time
 import urllib.request
@@ -58,6 +59,37 @@ def _normalize_url(url: str) -> str:
     return url
 
 
+# yt-dlp's --cookies-from-browser spec: BROWSER[+KEYRING][:PROFILE][::CONTAINER]
+_BROWSER_SPEC_RE = re.compile(
+    r"(?P<name>[^+:]+)(\s*\+\s*(?P<keyring>[^:]+))?"
+    r"(\s*:\s*(?!:)(?P<profile>.+?))?(\s*::\s*(?P<container>.+))?$"
+)
+
+
+def _parse_browser_spec(spec: str) -> tuple[str, str | None, str | None, str | None]:
+    """Parse a ``cookies_from_browser`` string into the
+    ``(browser, profile, keyring, container)`` tuple ``YoutubeDL`` expects."""
+    match = _BROWSER_SPEC_RE.fullmatch(spec.strip())
+    if match is None:
+        return (spec.strip().lower(), None, None, None)
+    keyring = match.group("keyring")
+    return (
+        match.group("name").strip().lower(),
+        match.group("profile"),
+        keyring.strip().upper() if keyring else None,
+        match.group("container"),
+    )
+
+
+def cookie_opts(cookies: str, cookies_from_browser: str) -> dict:
+    """yt-dlp cookie options for a config pair (a file takes precedence)."""
+    if cookies:
+        return {"cookiefile": cookies}
+    if cookies_from_browser:
+        return {"cookiesfrombrowser": _parse_browser_spec(cookies_from_browser)}
+    return {}
+
+
 def _snapshot_cookies(ydl: YoutubeDL) -> CookieSnapshot:
     out: CookieSnapshot = []
     try:
@@ -75,8 +107,16 @@ class Extractor:
     flow (and repeated quality endpoints) reuse a single extraction.
     """
 
-    def __init__(self, ttl_seconds: int) -> None:
+    def __init__(
+        self,
+        ttl_seconds: int,
+        *,
+        cookies: str = "",
+        cookies_from_browser: str = "",
+    ) -> None:
         self.ttl = ttl_seconds
+        self._cookies = cookies
+        self._cookies_from_browser = cookies_from_browser
         self._cache: dict[str, tuple[float, dict, CookieSnapshot]] = {}
         self._lock = threading.Lock()
 
@@ -84,8 +124,7 @@ class Extractor:
     def _key(url: str) -> str:
         return url.strip()
 
-    @staticmethod
-    def _ydl_opts() -> dict:
+    def _ydl_opts(self) -> dict:
         return {
             "quiet": True,
             "no_warnings": True,
@@ -93,6 +132,7 @@ class Extractor:
             "noplaylist": False,  # let carousels / slideshows expand
             "extract_flat": False,
             "ignore_no_formats_error": True,
+            **cookie_opts(self._cookies, self._cookies_from_browser),
         }
 
     def extract(self, url: str) -> tuple[dict, CookieSnapshot]:

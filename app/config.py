@@ -34,6 +34,18 @@ class FormatFilter(BaseModel):
     prefer_ext: list[str] = Field(default_factory=lambda: ["mp4", "m4a", "jpg"])
 
 
+class ExtractorConfig(BaseModel):
+    """yt-dlp auth for video extraction.
+
+    Some sites need cookies (age-gated or login-required YouTube, private
+    posts). Supply a Netscape ``cookies.txt`` file or a browser to pull cookies
+    from. Both empty => no cookies (yt-dlp's default).
+    """
+
+    cookies: str = ""
+    cookies_from_browser: str = ""
+
+
 class GalleryConfig(BaseModel):
     """gallery-dl auth/config for photo posts and image galleries.
 
@@ -68,6 +80,7 @@ class Config(BaseModel):
     server: ServerConfig = Field(default_factory=ServerConfig)
     api_keys: list[ApiKey] = Field(default_factory=list)
     format_filter: FormatFilter = Field(default_factory=FormatFilter)
+    extractor: ExtractorConfig = Field(default_factory=ExtractorConfig)
     gallery: GalleryConfig = Field(default_factory=GalleryConfig)
     sites: dict[str, SiteConfig] = Field(default_factory=dict)
 

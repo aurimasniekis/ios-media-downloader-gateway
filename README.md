@@ -169,6 +169,10 @@ prefer_vcodec = ["avc1", "h264"]  # iOS-friendly
 prefer_acodec = ["mp4a", "aac"]
 prefer_ext    = ["mp4", "m4a", "jpg"]
 
+[extractor]                       # yt-dlp auth (login-gated video only)
+cookies = ""                      # path to a Netscape cookies.txt, or
+cookies_from_browser = ""         # "firefox" / "chrome:Default" / "safari"
+
 [gallery]                         # gallery-dl auth (login-gated content only)
 cookies = ""                      # path to a Netscape cookies.txt, or
 cookies_from_browser = ""         # "firefox" / "chrome" / "safari", or
@@ -416,9 +420,12 @@ Notes:
 
 ## Notes & caveats
 
-- **Public content only** — no server-side login cookie files for video. Per-
-  format `http_headers` and any session cookies are surfaced; `cookies` is often
-  empty for public content.
+- **Public content by default.** Public posts need no auth: per-format
+  `http_headers` and any session cookies are surfaced, and `cookies` is usually
+  empty. For login-gated content (age-restricted or private YouTube, private
+  Instagram image posts, etc.) set `cookies` / `cookies_from_browser` in the
+  `[extractor]` config section — these are passed to yt-dlp as `--cookies` /
+  `--cookies-from-browser` and also feed the anonymous Instagram image path.
 
 - **Individual stream server-side merge.** Some services
   serves HD only as *separate* video and audio streams. With `merge_best = true`

@@ -4,7 +4,8 @@ yt-dlp reaches Instagram anonymously (via its GraphQL endpoint) but keeps only
 videos — for image posts it raises "There is no video in this post". This module
 reuses yt-dlp's own ``InstagramIE`` helpers, plus the ``doc_id`` read from the
 installed yt-dlp at runtime (so it tracks yt-dlp updates), to pull the images
-yt-dlp discards. No login or cookies required for public posts.
+yt-dlp discards. No login or cookies required for public posts; for
+login-gated posts, ``[extractor]`` cookies are passed through to yt-dlp.
 """
 from __future__ import annotations
 
@@ -13,6 +14,8 @@ import json
 import re
 import threading
 import time
+
+from .extractor import cookie_opts
 
 _SHORTCODE_RE = re.compile(r"instagram\.com/(?:[^/]+/)?(?:p|reel|reels|tv)/([^/?#]+)")
 _FALLBACK_DOC_ID = "8845758582119845"
@@ -50,7 +53,7 @@ def _doc_id_from_ytdlp() -> str:
     return _doc_id
 
 
-def _fetch_media(url: str) -> dict:
+def _fetch_media(url: str, ydl_opts: dict | None = None) -> dict:
     from yt_dlp import YoutubeDL
     from yt_dlp.extractor.instagram import InstagramIE, _id_to_pk
     from yt_dlp.utils import traverse_obj
@@ -60,7 +63,7 @@ def _fetch_media(url: str) -> dict:
         raise InstagramError("not an instagram post url")
     shortcode = match.group(1)
 
-    ydl = YoutubeDL({"quiet": True, "no_warnings": True})
+    ydl = YoutubeDL({"quiet": True, "no_warnings": True, **(ydl_opts or {})})
     ie = InstagramIE()
     ie.set_downloader(ydl)
     pk = _id_to_pk(shortcode)
@@ -112,14 +115,16 @@ def _fetch_media(url: str) -> dict:
     return media
 
 
-def extract_images(url: str) -> list[dict]:
+def extract_images(url: str, ydl_opts: dict | None = None) -> list[dict]:
     """Return image items (yt-dlp-like dicts) for a public Instagram post.
 
     Video children are skipped — those are served by yt-dlp's normal path.
+    ``ydl_opts`` (e.g. cookies) are passed through to the underlying yt-dlp
+    client so login-gated posts can be reached.
     """
     from yt_dlp.utils import traverse_obj, url_or_none
 
-    media = _fetch_media(url)
+    media = _fetch_media(url, ydl_opts)
     owner = traverse_obj(media, ("owner", "username"))
     caption = traverse_obj(media, ("edge_media_to_caption", "edges", 0, "node", "text"))
     title = caption or (f"Post by {owner}" if owner else None)
@@ -158,8 +163,15 @@ def extract_images(url: str) -> list[dict]:
 class InstagramExtractor:
     """TTL-cached anonymous Instagram image extraction."""
 
-    def __init__(self, ttl_seconds: int) -> None:
+    def __init__(
+        self,
+        ttl_seconds: int,
+        *,
+        cookies: str = "",
+        cookies_from_browser: str = "",
+    ) -> None:
         self.ttl = ttl_seconds
+        self._ydl_opts = cookie_opts(cookies, cookies_from_browser)
         self._cache: dict[str, tuple[float, list[dict]]] = {}
         self._lock = threading.Lock()
 
@@ -170,7 +182,7 @@ class InstagramExtractor:
             hit = self._cache.get(key)
             if hit is not None and now - hit[0] < self.ttl:
                 return hit[1]
-        items = extract_images(url)
+        items = extract_images(url, self._ydl_opts)
         with self._lock:
             self._cache[key] = (time.time(), items)
         return items

@@ -134,14 +134,22 @@ def _build_media_items(source, items_info, cookies, site, kind):
 def create_app(config: Config) -> FastAPI:
     app = FastAPI(title="ios-media-downloader-gateway", version="0.1.1")
     app.state.config = config
-    app.state.extractor = Extractor(config.server.cache_ttl_seconds)
+    app.state.extractor = Extractor(
+        config.server.cache_ttl_seconds,
+        cookies=config.extractor.cookies,
+        cookies_from_browser=config.extractor.cookies_from_browser,
+    )
     app.state.gallery = GalleryExtractor(
         config.server.cache_ttl_seconds,
         config_file=config.gallery.config_file,
         cookies=config.gallery.cookies,
         cookies_from_browser=config.gallery.cookies_from_browser,
     )
-    app.state.instagram = InstagramExtractor(config.server.cache_ttl_seconds)
+    app.state.instagram = InstagramExtractor(
+        config.server.cache_ttl_seconds,
+        cookies=config.extractor.cookies,
+        cookies_from_browser=config.extractor.cookies_from_browser,
+    )
     app.state.db = AuditDB(config.server.db_path)
     app.state.merge_secret = os.urandom(32)
     app.state.ffmpeg_ok = merge.ffmpeg_available(config.server.ffmpeg_path)

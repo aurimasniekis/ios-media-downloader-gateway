@@ -29,6 +29,12 @@ prefer_vcodec = ["avc1", "h264"]  # iOS-friendly video
 prefer_acodec = ["mp4a", "aac"]
 prefer_ext    = ["mp4", "m4a", "jpg"]
 
+# yt-dlp handles video extraction. Some sites need cookies (age-gated or
+# login-required YouTube, private posts). Provide auth here; both empty => none.
+[extractor]
+cookies              = ""   # path to a Netscape cookies.txt for yt-dlp
+cookies_from_browser = ""   # or pull from a browser: "firefox" / "chrome:Default" / "safari"
+
 # gallery-dl handles photo posts / image galleries (TikTok photo slideshows,
 # Instagram & Twitter image carousels). Some sites — notably Instagram — require
 # login, or extraction aborts at a "redirect to login page". Provide auth here:
